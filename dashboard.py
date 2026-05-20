@@ -713,20 +713,38 @@ models/
     fig_bar.update_layout(barmode="group", xaxis_tickangle=-20, **CHART_LAYOUT)
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    # ── row 3: score over time (if timestamp available) ──
-        st.divider()
-        st.subheader("Bot Score Over Time")
-        preds_t = preds.copy()
-        preds_t["timestamp"] = pd.to_datetime(preds_t["timestamp"], errors="coerce")
-        preds_t = preds_t.dropna(subset=["timestamp"]).sort_values("timestamp")
-        fig_line = px.line(preds_t, x="timestamp", y="ensemble_score",
-                           color_discrete_sequence=["#3b82f6"])
-        fig_line.add_hline(y=threshold, line_dash="dash", line_color="#dc2626")
-        fig_line.update_layout(**CHART_LAYOUT)
-        st.plotly_chart(fig_line, use_container_width=True)
+    # Timeline (if timestamp exists)
+    st.divider()
+    st.subheader("⏱️ Detection Timeline")
+    
+    if "timestamp" in preds.columns:
+        preds_time = preds.copy()
+        preds_time["timestamp"] = pd.to_datetime(preds_time["timestamp"], errors="coerce")
+        preds_time = preds_time.dropna(subset=["timestamp"]).sort_values("timestamp")
+        
+        if len(preds_time) > 0:
+            fig_timeline = px.line(
+                preds_time,
+                x="timestamp",
+                y="ensemble_score",
+                hover_data={"ensemble_score": ":.3f"},
+                labels={"timestamp": "Time", "ensemble_score": "Bot Score"}
+            )
+            fig_timeline.add_hline(y=threshold, line_dash="dash", line_color="#d63031", 
+                                   annotation_text="Threshold")
+            fig_timeline.update_traces(line=dict(color="#3498db", width=2))
+            fig_timeline.update_layout(**CHART_LAYOUT, height=350)
+            st.plotly_chart(fig_timeline, use_container_width=True)
+        else:
+            st.info("⏰ No timestamp data available")
+    else:
+        st.info("⏰ Timestamp column not found in data")
 
+# ─────────────────────────────────────────────────────────────────
+# PAGE: IP LOOKUP
+# ─────────────────────────────────────────────────────────────────
 
-elif page == "IP Lookup":
+elif page == "🔍 IP Lookup":
     st.markdown("# IP Lookup")
     st.markdown("<p style='color:#6b7280;margin-top:-12px;font-size:1rem'>Check any IP address against the logged traffic data</p>", unsafe_allow_html=True)
     ip_input = st.text_input("Enter an IP address to inspect", placeholder="e.g. 127.0.0.1")
@@ -824,20 +842,21 @@ elif page == "Model Explainability":
 
     st.divider()
     st.subheader("What Each Feature Means")
-        "ua_is_suspicious":      "User agent matches known bot signatures (python-requests, curl, etc.)",
-        "has_referer":           "Whether the request came with a Referer header (humans usually do)",
-        "has_accept_lang":       "Whether Accept-Language header was sent (bots often skip it)",
-        "hit_secret_page":       "Whether the IP visited the hidden honeypot endpoint /secret-data",
-        "ua_length":             "Length of the user agent string (bots tend to have shorter ones)",
-        "time_gap_seconds":      "Seconds between requests from the same IP (bots move very fast)",
-        "unique_pages_visited":  "Number of distinct pages visited (bots sweep many pages)",
-        "total_requests_from_ip":"Total request count from this IP in the dataset",
+    explanations = {
+        "ua_is_suspicious": "User agent matches known bot signatures (python-requests, curl, etc.)",
+        "has_referer": "Whether the request came with a Referer header (humans usually do)",
+        "has_accept_lang": "Whether Accept-Language header was sent (bots often skip it)",
+        "hit_secret_page": "Whether the IP visited the hidden honeypot endpoint /secret-data",
+        "ua_length": "Length of the user agent string (bots tend to have shorter ones)",
+        "time_gap_seconds": "Seconds between requests from the same IP (bots move very fast)",
+        "unique_pages_visited": "Number of distinct pages visited (bots sweep many pages)",
+        "total_requests_from_ip": "Total request count from this IP in the dataset",
     }
     for feat, desc in explanations.items():
         st.markdown(f"**`{feat}`** — {desc}")
 
 
-elif page == "Raw Data":
+elif page == "📋 Raw Data":
     st.markdown("# Raw Predictions Log")
     st.markdown("<p style='color:#6b7280;margin-top:-12px;font-size:1rem'>Full dataset with scores, flags, and filtering</p>", unsafe_allow_html=True)
     st.divider()
