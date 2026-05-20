@@ -7,7 +7,7 @@ from datetime import datetime
 
 st.set_page_config(
     page_title="Victor — Bot Detection",
-    page_icon=":shield:",
+    page_icon="⚔",
     layout="wide",
     initial_sidebar_state="expanded"
 )
