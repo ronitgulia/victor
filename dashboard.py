@@ -165,6 +165,65 @@ st.markdown("""
     [data-testid="stSidebar"] [data-testid="stMetricDelta"] {
         color: #a8e6cf !important;
     }
+    
+    /* Activity Feed Styles */
+    .activity-feed {
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        border-left: 4px solid #0984e3;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 12px 0;
+    }
+    
+    .activity-item {
+        padding: 12px;
+        margin: 10px 0;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #e0e6ed;
+        transition: all 0.2s ease;
+    }
+    
+    .activity-item:hover {
+        border-color: #0984e3;
+        box-shadow: 0 4px 12px rgba(9, 132, 227, 0.1);
+        transform: translateX(4px);
+    }
+    
+    .activity-label {
+        font-size: 0.85rem;
+        color: #636e72;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .activity-value {
+        font-size: 1rem;
+        color: #2d3436;
+        font-weight: 500;
+        margin-top: 4px;
+    }
+    
+    .bot-badge {
+        display: inline-block;
+        background: #ffe0e0;
+        color: #d63031;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    
+    .human-badge {
+        display: inline-block;
+        background: #e0f7e0;
+        color: #00b894;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
 
 </style>
 """, unsafe_allow_html=True)
@@ -246,8 +305,8 @@ avg_bot_score = preds["ensemble_score"].mean()
 
 with st.sidebar:
     st.markdown("## VICTOR")
-    st.markdown("**Bot Detection System**")
-    st.markdown("_Real-time behavioral analysis_")
+    st.markdown("**Your Bot Detection Watchdog**")
+    st.markdown("_Keeps your traffic clean_")
     st.divider()
     
     # Live indicator
@@ -255,11 +314,11 @@ with st.sidebar:
     with col1:
         st.markdown('<span class="live-indicator"></span>', unsafe_allow_html=True)
     with col2:
-        st.markdown("**Live** • Last update: `just now`")
+        st.markdown("**Live** • Just now")
     
     st.divider()
     
-    st.markdown("### Navigation")
+    st.markdown("### Where to?")
     page = st.radio(
         "Select View:",
         ["Dashboard", "IP Lookup", "Model Explainability", "Raw Data", "Settings"],
@@ -268,7 +327,7 @@ with st.sidebar:
     
     st.divider()
     
-    st.markdown("### Quick Stats")
+    st.markdown("### The Numbers")
     col_a, col_b = st.columns(2)
     col_a.metric("Bots", f"{bots_count:,}", f"{bot_pct:.1f}%")
     col_b.metric("Humans", f"{human_count:,}", f"{human_pct:.1f}%")
@@ -276,20 +335,20 @@ with st.sidebar:
     st.divider()
     
     if metrics:
-        st.markdown("### Model Performance")
+        st.markdown("### Model Quality")
         st.metric("XGBoost AUC", f"{metrics.get('xgb_auc', 0):.3f}")
         st.metric("Isolation Forest", f"{metrics.get('iso_auc', 0):.3f}")
     
     st.divider()
     
     threshold = st.slider(
-        "Bot Score Threshold",
+        "When to flag as bot?",
         0.0, 1.0, 0.5, 0.05,
-        help="Requests scoring above this are flagged as bots"
+        help="Adjust this to be more or less sensitive"
     )
     
-    st.markdown("### Refresh Settings")
-    refresh_now = st.button("Refresh Data Now", use_container_width=True)
+    st.markdown("### Refresh")
+    refresh_now = st.button("Get fresh data", use_container_width=True)
     if refresh_now:
         st.cache_data.clear()
         st.rerun()
@@ -300,7 +359,7 @@ with st.sidebar:
 
 if page == "Dashboard":
     st.markdown("# Victor Dashboard")
-    st.markdown("_Live bot detection powered by ensemble ML • Auto-refreshes every 5 seconds_")
+    st.markdown("_Real-time bot detection powered by ensemble ML • See what's happening right now_")
     st.divider()
     
     # Key metrics with humanized display
@@ -341,7 +400,7 @@ if page == "Dashboard":
     col_left, col_right = st.columns(2)
     
     with col_left:
-        st.subheader("Traffic Composition")
+        st.subheader("Traffic Breakdown")
         pie_data = pd.DataFrame({
             "Type": ["Bots", "Humans"],
             "Count": [bots_count, human_count],
@@ -385,8 +444,8 @@ if page == "Dashboard":
     st.divider()
     
     # Feature importance
-    st.subheader("Feature Importance: Bots vs Humans")
-    st.markdown("_How different behavior patterns differentiate bots from legitimate users_")
+    st.subheader("What Separates Bots from Real Users?")
+    st.markdown("_These behaviors show the biggest differences_")
     
     bot_means = features[features["label"] == 1][FEATURE_COLS].mean()
     human_means = features[features["label"] == 0][FEATURE_COLS].mean()
@@ -415,7 +474,8 @@ if page == "Dashboard":
     
     # Timeline (if timestamp exists)
     st.divider()
-    st.subheader("Detection Timeline")
+    st.subheader("When Do Bots Attack?")
+    st.markdown("_Bot confidence scores over time_")
     
     if "timestamp" in preds.columns:
         preds_time = preds.copy()
@@ -438,15 +498,105 @@ if page == "Dashboard":
         else:
             st.info("No timestamp data available")
     else:
-        st.info("Timestamp column not found in data")
-
+        st.info("Timestamp column not found in data")    
+    # ─────────────────────────────────────────────────────────────────
+    # REAL-TIME ACTIVITY SECTION
+    # ─────────────────────────────────────────────────────────────────
+    
+    st.divider()
+    st.markdown("## 🔍 Recent Activity")
+    st.markdown("_Latest requests flowing through Victor right now_")
+    
+    # Get recent requests (last 10)
+    recent_requests = preds.tail(10).copy()
+    
+    if len(recent_requests) > 0:
+        # Create a more humanized real-time activity feed
+        activity_cols = st.columns(1)
+        
+        with activity_cols[0]:
+            # Display activity feed
+            activity_html = '<div class="activity-feed">'
+            
+            for idx, row in recent_requests.iterrows():
+                score = row.get("ensemble_score", 0)
+                is_bot = score > threshold
+                badge = '🤖 BOT' if is_bot else '👤 HUMAN'
+                badge_class = 'bot-badge' if is_bot else 'human-badge'
+                score_color = '#d63031' if is_bot else '#00b894'
+                
+                ip = row.get("ip", "Unknown")
+                requests_from_ip = len(preds[preds.get("ip", pd.Series()) == ip]) if "ip" in preds.columns else "—"
+                
+                activity_html += f'<div class="activity-item"><div style="display: flex; justify-content: space-between; align-items: start;"><div><div class="activity-label">Request from</div><div class="activity-value"><code>{ip}</code></div></div><div style="text-align: right;"><span class="{badge_class}">{badge}</span><div class="activity-value" style="margin-top: 6px; font-size: 0.9rem; color: #636e72;">Score: <b style="color: {score_color};">{score:.2%}</b></div></div></div><div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e6ed; font-size: 0.85rem; color: #636e72;">{requests_from_ip} total requests from this IP</div></div>'
+            
+            activity_html += '</div>'
+            st.markdown(activity_html, unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # Quick insights section
+    st.markdown("## 💡 Quick Insights")
+    
+    insight_cols = st.columns(3)
+    
+    # Insight 1: Most active IP
+    with insight_cols[0]:
+        if "ip" in preds.columns:
+            top_ip = preds["ip"].value_counts().head(1)
+            if len(top_ip) > 0:
+                top_ip_addr = top_ip.index[0]
+                top_ip_count = top_ip.values[0]
+                top_ip_avg_score = preds[preds["ip"] == top_ip_addr]["ensemble_score"].mean()
+                top_ip_status = "🤖 Bot" if top_ip_avg_score > threshold else "👤 Human"
+                
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); 
+                            border-radius: 8px; padding: 16px; border: 1px solid #90caf9;">
+                    <div style="color: #1565c0; font-weight: 600; font-size: 0.9rem;">MOST ACTIVE</div>
+                    <div style="color: #0d47a1; font-size: 1.2rem; font-weight: 700; margin: 8px 0;">{top_ip_addr}</div>
+                    <div style="color: #42a5f5; font-size: 0.9rem;">
+                        {top_ip_count} requests • {top_ip_status}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # Insight 2: Detection accuracy
+    with insight_cols[1]:
+        detection_rate = (bots_count / total * 100) if total > 0 else 0
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); 
+                    border-radius: 8px; padding: 16px; border: 1px solid #ce93d8;">
+            <div style="color: #6a1b9a; font-weight: 600; font-size: 0.9rem;">BOT DETECTION RATE</div>
+            <div style="color: #4a148c; font-size: 1.2rem; font-weight: 700; margin: 8px 0;">{detection_rate:.1f}%</div>
+            <div style="color: #8e24aa; font-size: 0.9rem;">
+                {bots_count:,} bots out of {total:,}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Insight 3: Average confidence
+    with insight_cols[2]:
+        high_confidence_bots = len(preds[preds["ensemble_score"] > 0.9])
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); 
+                    border-radius: 8px; padding: 16px; border: 1px solid #a5d6a7;">
+            <div style="color: #1b5e20; font-weight: 600; font-size: 0.9rem;">HIGH CONFIDENCE</div>
+            <div style="color: #0d3817; font-size: 1.2rem; font-weight: 700; margin: 8px 0;">{high_confidence_bots:,}</div>
+            <div style="color: #388e3c; font-size: 0.9rem;">
+                Detected with 90%+ confidence
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 # ─────────────────────────────────────────────────────────────────
 # PAGE: IP LOOKUP
 # ─────────────────────────────────────────────────────────────────
 
 elif page == "IP Lookup":
-    st.markdown("# IP Address Lookup")
-    st.markdown("_Inspect any IP address and see its full activity profile_")
+    st.markdown("# Inspect an IP")
+    st.markdown("_Type in any IP address and I'll show you everything we know about it_")
     st.divider()
     
     ip_input = st.text_input(
@@ -522,8 +672,8 @@ elif page == "IP Lookup":
 # ─────────────────────────────────────────────────────────────────
 
 elif page == "Model Explainability":
-    st.markdown("# Understanding the Model")
-    st.markdown("_How does Victor decide if traffic is a bot? Learn the decision-making process._")
+    st.markdown("# How Victor Works")
+    st.markdown("_Here's what the model is actually looking at to make decisions_")
     st.divider()
     
     st.subheader("Feature Explanations")
@@ -587,8 +737,8 @@ elif page == "Model Explainability":
 # ─────────────────────────────────────────────────────────────────
 
 elif page == "Raw Data":
-    st.markdown("# Raw Predictions")
-    st.markdown("_View and filter the complete detection log_")
+    st.markdown("# The Full Log")
+    st.markdown("_Every request Victor has analyzed, with scores and verdicts_")
     st.divider()
     
     col_filter1, col_filter2, col_filter3 = st.columns([2, 1, 1])
@@ -634,7 +784,8 @@ elif page == "Raw Data":
 # ─────────────────────────────────────────────────────────────────
 
 elif page == "Settings":
-    st.markdown("# Settings & Configuration")
+    st.markdown("# Settings & Info")
+    st.markdown("_Configuration and stats about your detection system_")
     st.divider()
     
     st.markdown("### Dataset Information")
