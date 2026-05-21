@@ -84,8 +84,8 @@ metrics = load_metrics()
 
 if preds is None or features is None:
     st.error(
-        "Data files not found! Pipeline pehle chalao:\n"
-        "- `python honeypot.py` (alag terminal)\n"
+        "Data files not found! Run the pipeline first:\n"
+        "- `python honeypot.py` (separate terminal)\n"
         "- `python simulate_traffic.py`\n"
         "- `python feature_engineering.py`\n"
         "- `python train_model.py`"
@@ -244,21 +244,21 @@ if page == "Dashboard":
 # ──────────────────────────────────────────────────────────────────
 elif page == "IP Lookup":
     st.markdown("# IP Lookup")
-    st.markdown("_Kisi bhi IP ka poora record dekho_")
+    st.markdown("_View the full record for any IP address_")
     st.divider()
 
-    ip_input = st.text_input("IP address daalo:", placeholder="e.g. 127.0.0.1")
+    ip_input = st.text_input("Enter IP address:", placeholder="e.g. 127.0.0.1")
 
     if ip_input:
         has_ip_col = "ip" in preds.columns
         if not has_ip_col:
-            st.error("predictions.csv mein 'ip' column nahi hai. "
-                     "feature_engineering.py dobara chalao.")
+            st.error("'ip' column not found in predictions.csv. "
+                     "Please re-run feature_engineering.py.")
         else:
             ip_data = preds[preds["ip"] == ip_input]
 
             if len(ip_data) == 0:
-                st.warning(f"**{ip_input}** ke liye koi record nahi mila.")
+                st.warning(f"No records found for **{ip_input}**.")
             else:
                 avg_score = ip_data["ensemble_score"].mean()
                 max_score = ip_data["ensemble_score"].max()
@@ -298,14 +298,14 @@ elif page == "IP Lookup":
                                           "iso_score", "victor_flag"] if c in ip_data.columns]
                 st.dataframe(ip_data[show_cols].round(4), use_container_width=True)
     else:
-        st.info("Upar IP address daalo")
+        st.info("Enter an IP address above to look it up")
 
 # ──────────────────────────────────────────────────────────────────
 # PAGE: MODEL EXPLAINABILITY
 # ──────────────────────────────────────────────────────────────────
 elif page == "Model Explainability":
     st.markdown("# Model Explainability")
-    st.markdown("_Victor kyun kisi ko bot maanta hai — yahan samjho_")
+    st.markdown("_Understand why Victor classifies a request as a bot_")
     st.divider()
 
     shap_img_global = "data/shap/global_summary.png"
@@ -323,7 +323,7 @@ elif page == "Model Explainability":
                 st.subheader("Average Feature Impact")
                 st.image(shap_img_bar, use_container_width=True)
     else:
-        st.warning("SHAP plots nahi mile. Pehle `python explain.py` chalao.")
+        st.warning("SHAP plots not found. Run `python explain.py` first.")
 
     if shap_csv is not None:
         st.divider()
@@ -344,16 +344,16 @@ elif page == "Model Explainability":
         st.plotly_chart(fig_heat, use_container_width=True)
 
     st.divider()
-    st.subheader("Har Feature ka Matlab")
+    st.subheader("What Each Feature Means")
     explanations = {
-        "ua_is_suspicious":        "User agent mein bot keywords hain (python-requests, curl, etc.)",
-        "has_referer":             "Request ke saath Referer header aaya? Humans generally bhejte hain.",
-        "has_accept_lang":         "Accept-Language header tha? Bots aksar nahi bhejte.",
-        "hit_secret_page":         "IP ne hidden honeypot endpoint /secret-data visit kiya?",
-        "ua_length":               "User agent string ki length — bots ka chhota hota hai.",
-        "time_gap_seconds":        "Requests ke beech ka time — bots bahut fast hote hain.",
-        "unique_pages_visited":    "Kitne alag pages visit kiye — bots jyada pages sweep karte hain.",
-        "total_requests_from_ip":  "Is IP se total kitni requests aayi.",
+        "ua_is_suspicious":        "User agent contains bot keywords (python-requests, curl, etc.)",
+        "has_referer":             "Did the request include a Referer header? Humans typically send one.",
+        "has_accept_lang":         "Was the Accept-Language header present? Bots often omit it.",
+        "hit_secret_page":         "Did the IP visit the hidden honeypot endpoint /secret-data?",
+        "ua_length":               "Length of the user agent string — bots tend to have shorter ones.",
+        "time_gap_seconds":        "Time between requests — bots fire requests much faster.",
+        "unique_pages_visited":    "Number of distinct pages visited — bots sweep more pages.",
+        "total_requests_from_ip":  "Total number of requests made from this IP.",
     }
     for feat, desc in explanations.items():
         st.markdown(f"**`{feat}`** — {desc}")
@@ -363,7 +363,7 @@ elif page == "Model Explainability":
 # ──────────────────────────────────────────────────────────────────
 elif page == "Raw Data":
     st.markdown("# Raw Predictions Log")
-    st.markdown("_Saari requests unke scores aur verdict ke saath_")
+    st.markdown("_All requests with their scores and verdict_")
     st.divider()
 
     col_f1, col_f2, col_f3 = st.columns([2, 1, 1])
@@ -413,14 +413,14 @@ elif page == "Settings":
 
     st.divider()
     st.markdown("### Current Threshold")
-    st.info(f"Threshold: **{threshold}** — isse zyada score = bot")
+    st.info(f"Threshold: **{threshold}** — any score above this is flagged as a bot")
 
     st.divider()
     st.markdown("### Model Metrics")
     if metrics:
         st.json(metrics)
     else:
-        st.warning("metrics file nahi mili — pehle train_model.py chalao")
+        st.warning("Metrics file not found — run train_model.py first")
 
     st.divider()
     st.markdown("### File Structure")
