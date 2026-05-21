@@ -8,10 +8,12 @@ from flask import Flask, request, jsonify
 from datetime import datetime
 import uuid
 import os
+import atexit
 from database import TrafficDatabase
 
 app = Flask(__name__)
 db = TrafficDatabase()
+atexit.register(db.close)  # ensure SQLite connection is released on exit
 
 # Session tracking
 CURRENT_SESSION = str(uuid.uuid4())

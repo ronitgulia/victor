@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 import joblib, json, os
+from datetime import datetime
 from sklearn.ensemble import IsolationForest
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (classification_report,
@@ -10,6 +11,9 @@ from sklearn.metrics import (classification_report,
                              recall_score,
                              f1_score)
 from xgboost import XGBClassifier
+from config_loader import Config
+
+Config()  # load singleton before accessing any keys
 
 # ──────────────────────────────────────────────────────────────────
 # STEP 1 — load features
@@ -108,12 +112,17 @@ print(f"ROC-AUC: {xgb_auc:.3f}")
 # STEP 4 — Ensemble score + save predictions
 # ──────────────────────────────────────────────────────────────────
 xgb_scores_full = xgb_model.predict_proba(X)[:, 1]
-ensemble_score  = (iso_scores * 0.4) + (xgb_scores_full * 0.6)
 
+# Ensemble weights from config (default 40 / 60)
+iso_w          = Config.get("detection.ensemble_weights.isolation_forest", 0.4)
+xgb_w          = Config.get("detection.ensemble_weights.xgboost",          0.6)
+ensemble_score = (iso_scores * iso_w) + (xgb_scores_full * xgb_w)
+
+threshold      = Config.get("detection.default_threshold", 0.5)
 df["iso_score"]      = iso_scores
 df["xgb_score"]      = xgb_scores_full
 df["ensemble_score"] = ensemble_score
-df["victor_flag"]    = (ensemble_score > 0.5).astype(int)
+df["victor_flag"]    = (ensemble_score > threshold).astype(int)
 
 # ip column already in df (from features.csv) — preserved automatically
 df.to_csv("data/predictions.csv", index=False)
@@ -125,10 +134,18 @@ print(f"\nVictor flagged {flagged}/{total} requests as bots ({flagged/total*100:
 # ──────────────────────────────────────────────────────────────────
 # STEP 5 — Save models + metrics
 # ──────────────────────────────────────────────────────────────────
-os.makedirs("models", exist_ok=True)
+ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+os.makedirs("models",          exist_ok=True)
+os.makedirs("models/versions", exist_ok=True)
+
+# Active models (used by dashboard + explain.py)
 joblib.dump(iso_forest, "models/isolation_forest.pkl")
 joblib.dump(xgb_model,  "models/xgboost_model.pkl")
-print("Models saved to models/")
+
+# Versioned backups for rollback
+joblib.dump(iso_forest, f"models/versions/isolation_forest_{ts}.pkl")
+joblib.dump(xgb_model,  f"models/versions/xgboost_model_{ts}.pkl")
+print(f"Models saved → models/  (versioned backup: models/versions/*_{ts}.pkl)")
 
 metrics = {
     "xgb_auc"        : round(xgb_auc, 4),

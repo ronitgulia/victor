@@ -10,6 +10,9 @@ paths:
   data_dir: "data"
   models_dir: "models"
   
+  # Database
+  traffic_db: "data/victor_traffic.db"
+  
   # Input/Output files
   traffic_logs: "data/traffic_logs.json"
   features: "data/features.csv"
@@ -97,8 +100,13 @@ detection:
   threshold_max: 1.0
   threshold_step: 0.05
   
-  # Ensemble scoring method: "average" or "weighted"
-  ensemble_method: average
+  # Weighted ensemble: iso_score * iso_weight + xgb_score * xgb_weight
+  ensemble_weights:
+    isolation_forest: 0.4
+    xgboost: 0.6
+  
+  # Sidebar alert fires when bot % exceeds this value
+  bot_spike_threshold: 60.0
 
 # ─────────────────────────────────────────────────────────────────
 # TRAFFIC SIMULATION
@@ -154,7 +162,11 @@ dashboard:
   # Default filters
   default_filter: "All"
   default_min_score: 0.0
-  default_max_rows: 100
+  default_max_rows: 200
+  
+  # Live mode defaults
+  live_mode_default: false
+  live_mode_refresh_interval: 5
   
   # Chart height
   chart_height_default: 400

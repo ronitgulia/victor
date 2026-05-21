@@ -3,8 +3,12 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import json, os
+import json, os, time
+import requests
 from datetime import datetime
+from config_loader import Config
+
+Config()  # load singleton before @st.cache_data decorators evaluate
 
 st.set_page_config(
     page_title="Victor — Bot Detection",
@@ -50,7 +54,7 @@ CHART_LAYOUT = dict(
 # ──────────────────────────────────────────────────────────────────
 # DATA LOADING
 # ──────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=Config.get("dashboard.cache_ttl", 5))
 def load_data():
     try:
         preds    = pd.read_csv("data/predictions.csv")
@@ -59,18 +63,33 @@ def load_data():
     except FileNotFoundError:
         return None, None
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=Config.get("dashboard.cache_ttl_metrics", 10))
 def load_metrics():
     if os.path.exists("data/model_metrics.json"):
         with open("data/model_metrics.json") as f:
             return json.load(f)
     return None
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=Config.get("dashboard.cache_ttl_metrics", 10))
 def load_shap_csv():
     path = "data/shap/shap_values.csv"
     if os.path.exists(path):
         return pd.read_csv(path)
+    return None
+
+@st.cache_data(ttl=3600)
+def get_geolocation(ip: str):
+    """Fetch IP geolocation from ip-api.com (free, no API key needed)."""
+    try:
+        resp = requests.get(
+            f"http://ip-api.com/json/{ip}?fields=status,country,regionName,city,isp,query",
+            timeout=4
+        )
+        data = resp.json()
+        if data.get("status") == "success":
+            return data
+    except Exception:
+        pass
     return None
 
 FEATURE_COLS = [
@@ -126,7 +145,31 @@ with st.sidebar:
         st.metric("Isolation Forest",  f"{metrics.get('iso_auc', 0):.3f}")
         st.divider()
 
-    threshold = st.slider("Bot score threshold", 0.0, 1.0, 0.5, 0.05)
+    threshold = st.slider(
+        "Bot score threshold",
+        float(Config.get("detection.threshold_min", 0.0)),
+        float(Config.get("detection.threshold_max", 1.0)),
+        float(Config.get("detection.default_threshold", 0.5)),
+        float(Config.get("detection.threshold_step", 0.05)),
+    )
+
+    # Bot spike alert
+    spike_limit = Config.get("detection.bot_spike_threshold", 60.0)
+    if bot_pct > spike_limit:
+        st.error(f"⚠️ Bot Spike! {bot_pct:.1f}% of traffic is bots")
+
+    st.divider()
+    st.markdown("### Live Mode")
+    live_mode = st.toggle(
+        "🔴 Auto-Refresh",
+        value=bool(Config.get("dashboard.live_mode_default", False)),
+        help="Automatically refreshes data on a fixed interval"
+    )
+    refresh_interval = (
+        st.slider("Refresh every (s)", 3, 60,
+                  int(Config.get("dashboard.live_mode_refresh_interval", 5)))
+        if live_mode else 5
+    )
 
     if st.button("🔄 Refresh Data", use_container_width=True):
         st.cache_data.clear()
@@ -281,6 +324,16 @@ elif page == "IP Lookup":
                 </div>
                 """, unsafe_allow_html=True)
 
+                # Geolocation enrichment
+                with st.spinner("Looking up location..."):
+                    geo = get_geolocation(ip_input)
+                if geo:
+                    st.info(
+                        f"📍 **{geo.get('city', '—')}, {geo.get('regionName', '—')}, "
+                        f"{geo.get('country', '—')}**  ·  "
+                        f"🏢 **ISP**: {geo.get('isp', '—')}"
+                    )
+
                 k1, k2, k3 = st.columns(3)
                 k1.metric("Requests", f"{req_count:,}")
                 k2.metric("Avg Score", f"{avg_score:.3f}")
@@ -372,7 +425,10 @@ elif page == "Raw Data":
     with col_f2:
         min_score = st.slider("Min score", 0.0, 1.0, 0.0, 0.01)
     with col_f3:
-        max_rows = st.number_input("Max rows:", 10, 10000, 200)
+        max_rows = st.number_input(
+            "Max rows:", 10, 10000,
+            Config.get("dashboard.default_max_rows", 200)
+        )
 
     display_df = preds.copy()
     display_df["victor_flag"] = (display_df["ensemble_score"] > threshold).astype(int)
@@ -435,4 +491,15 @@ elif page == "Settings":
     └── feature_bar.png
 models/
 ├── isolation_forest.pkl
-└── xgboost_model.pkl""", language="bash")
+├── xgboost_model.pkl
+└── versions/
+    ├── isolation_forest_<timestamp>.pkl
+    └── xgboost_model_<timestamp>.pkl""", language="bash")
+
+# ──────────────────────────────────────────────────────────────────
+# LIVE MODE — auto-refresh
+# ──────────────────────────────────────────────────────────────────
+if live_mode:
+    time.sleep(refresh_interval)
+    st.cache_data.clear()
+    st.rerun()
