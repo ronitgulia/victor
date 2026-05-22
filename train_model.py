@@ -1,4 +1,5 @@
 # train_model.py
+import sys
 import pandas as pd
 import numpy as np
 import joblib, json, os
@@ -50,7 +51,7 @@ if y.nunique() < 2:
     print("  python simulate_traffic.py")
     print("  python feature_engineering.py")
     print("  python train_model.py")
-    exit(1)
+    sys.exit(1)
 
 # ──────────────────────────────────────────────────────────────────
 # STEP 2 — Isolation Forest (unsupervised)
@@ -132,6 +133,7 @@ df["ensemble_score"] = ensemble_score
 df["victor_flag"]    = (ensemble_score > threshold).astype(int)
 
 # ip column already in df (from features.csv) — preserved automatically
+os.makedirs("data", exist_ok=True)
 df.to_csv("data/predictions.csv", index=False)
 
 total   = len(df)
