@@ -50,6 +50,7 @@ features:
     - header_count
     - missing_common_headers
     - accept_encoding_score
+    - burst_count_10s
   
   # Bot detection keywords in User-Agent
   bot_keywords:
@@ -73,6 +74,21 @@ features:
     - insomnia
     - httpclient
     - node-fetch
+    - ahrefsbot
+    - baiduspider
+    - yandexbot
+    - bingbot
+    - duckduckbot
+    - slurp
+    - sogou
+    - facebot
+    - ia_archiver
+    - mj12bot
+    - semrushbot
+    - dotbot
+    - petalbot
+    - bytespider
+    - applebot
   
   # Special endpoints that only bots visit
   secret_endpoints:

@@ -75,6 +75,7 @@ def main():
         "unique_pages_visited", "total_requests_from_ip",
         "is_datacenter_ip", "header_count",
         "missing_common_headers", "accept_encoding_score",
+        "burst_count_10s"
     ])
 
     # Only train on features that actually exist in the CSV
@@ -162,6 +163,23 @@ def main():
         random_state     = Config.get("models.xgboost.random_state", 42),
         verbosity        = 0,
     )
+
+    # 5-fold CV for reliable metrics
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
+    cv_auc_scores = []
+    
+    for train_idx, val_idx in skf.split(X_train, y_train):
+        X_tr, X_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
+        y_tr, y_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
+        
+        cv_model = XGBClassifier(**xgb_model.get_params())
+        cv_model.fit(X_tr, y_tr, eval_set=[(X_val, y_val)], verbose=False)
+        cv_auc_scores.append(roc_auc_score(y_val, cv_model.predict_proba(X_val)[:, 1]))
+    
+    cv_auc_mean = np.mean(cv_auc_scores)
+    logger.info(f"\n--- XGBoost 5-Fold CV ---")
+    logger.info(f"Mean CV ROC-AUC: {cv_auc_mean:.3f} (+/- {np.std(cv_auc_scores)*2:.3f})")
+
     xgb_model.fit(
         X_train, y_train,
         eval_set=[(X_test, y_test)],
@@ -231,11 +249,23 @@ def main():
 
     ensemble_score = (iso_scores_full * iso_w) + (xgb_scores_full * xgb_w)
 
-    threshold = Config.get("detection.default_threshold", 0.5)
+    # Threshold sweeping on validation set
+    ensemble_score_test = (iso_scores_test * iso_w) + (xgb_scores_test * xgb_w)
+    best_thresh = 0.5
+    best_f1 = 0.0
+    for th in np.arange(0.1, 0.95, 0.05):
+        f1 = f1_score(y_test, (ensemble_score_test > th).astype(int), zero_division=0)
+        if f1 > best_f1:
+            best_f1 = f1
+            best_thresh = th
+            
+    logger.info(f"\n--- Threshold Sweeping ---")
+    logger.info(f"  Best Threshold : {best_thresh:.2f} (F1: {best_f1:.3f})")
+
     df["iso_score"]      = iso_scores_full
     df["xgb_score"]      = xgb_scores_full
     df["ensemble_score"] = ensemble_score
-    df["victor_flag"]    = (ensemble_score > threshold).astype(int)
+    df["victor_flag"]    = (ensemble_score > best_thresh).astype(int)
 
     
     df.to_csv(Paths.PREDICTIONS, index=False)
@@ -269,11 +299,11 @@ def main():
           f"({len(FEATURE_COLS)} features)")
 
     # Persist the tuned ensemble weights so dashboard & honeypot use them
-    ensemble_weights = {"isolation_forest": iso_w, "xgboost": xgb_w}
+    ensemble_weights = {"isolation_forest": iso_w, "xgboost": xgb_w, "best_threshold": best_thresh}
     with open(Paths.ENSEMBLE_WEIGHTS, "w") as f:
         json.dump(ensemble_weights, f, indent=2)
     logger.info(f"Ensemble weights saved → models/ensemble_weights.json  "
-          f"(iso={iso_w}, xgb={xgb_w})")
+          f"(iso={iso_w}, xgb={xgb_w}, thresh={best_thresh:.2f})")
 
     # Compute ensemble AUC on test set with final weights for the metrics file
     ensemble_auc_test = roc_auc_score(

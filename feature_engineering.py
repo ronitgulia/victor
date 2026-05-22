@@ -36,9 +36,10 @@ FEATURE_COLS = [
     "ua_is_suspicious", "has_referer", "has_accept_lang",
     "hit_secret_page", "ua_length", "time_gap_seconds",
     "unique_pages_visited", "total_requests_from_ip",
-    # New 4 (Step 6)
+    # New 4 features (Step 6)
     "is_datacenter_ip", "header_count",
     "missing_common_headers", "accept_encoding_score",
+    "burst_count_10s"
 ]
 
 
@@ -138,6 +139,11 @@ def engineer_features() -> pd.DataFrame:
         total_requests_from_ip = ("ip",   "count"),
     ).reset_index()
     df = df.merge(ip_agg, on="ip", how="left")
+
+    # Burst count (rolling 10s)
+    df_indexed = df.set_index("timestamp")
+    df_indexed["burst_count_10s"] = df_indexed.groupby("ip").rolling("10s")["ip"].count().reset_index(level=0, drop=True)
+    df = df_indexed.reset_index()
 
     # ── New 4 features (Step 6) ───────────────────────────────────
     logger.info("Computing new features (Step 6)...")

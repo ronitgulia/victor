@@ -124,6 +124,17 @@ class RealTimeScorer:
                 # Fallback to config if feature_cols.json doesn't exist yet
                 self.feature_cols = Config.get("features.columns", [])
 
+            # Load tuned threshold from ensemble_weights.json
+            weight_path = Config.get("paths.ensemble_weights", Paths.ENSEMBLE_WEIGHTS)
+            if os.path.exists(weight_path):
+                try:
+                    with open(weight_path) as f:
+                        weights = json.load(f)
+                        if "best_threshold" in weights:
+                            self.threshold = weights["best_threshold"]
+                except Exception:
+                    pass
+
             logger.info(f"[RealTimeScorer] Model loaded  ({len(self.feature_cols)} features)")
             logger.info(f"[RealTimeScorer] Threshold: {self.threshold}  |  "
                   f"Blocking: {'ON' if self.blocking else 'OFF (log-only)'}")
@@ -177,6 +188,13 @@ class RealTimeScorer:
         else:
             accept_encoding_score = 0
 
+        # Burst count (rolling 10s)
+        try:
+            t_now = datetime.fromisoformat(record["timestamp"])
+            burst_count_10s = sum(1 for r in history if (t_now - datetime.fromisoformat(r["timestamp"])).total_seconds() <= 10)
+        except Exception:
+            burst_count_10s = 1
+
         return {
             "ua_is_suspicious":       ua_is_suspicious,
             "has_referer":            has_referer,
@@ -190,6 +208,7 @@ class RealTimeScorer:
             "header_count":           header_count,
             "missing_common_headers": missing_common,
             "accept_encoding_score":  accept_encoding_score,
+            "burst_count_10s":        burst_count_10s,
         }
 
     def score(self, record: dict) -> tuple:
@@ -334,7 +353,7 @@ def save_request(response):
                 is_blocked      = log_data.get("is_blocked",      0),
             )
         except Exception as e:
-            logger.info(f"[DB Error] Failed to log request: {e}")
+            logger.error(f"[DB Error] Failed to log request: {e}")
     return response
 
 
