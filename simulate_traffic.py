@@ -2,6 +2,10 @@ import requests
 import time
 import random
 from faker import Faker
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 
 fake = Faker()
 
@@ -12,7 +16,7 @@ BOT_PAGES   = ["/", "/articles", "/about", "/secret-data", "/secret-data", "/sec
 
 
 def simulate_human(num_sessions=40):
-    print("Simulating human traffic...")
+    logger.info("Simulating human traffic...")
 
     for i in range(num_sessions):
         pages = random.sample(HUMAN_PAGES, k=random.randint(2, 3))
@@ -29,7 +33,7 @@ def simulate_human(num_sessions=40):
                     timeout=3
                 )
             except Exception as e:
-                print(f"  Error: {e}")
+                logger.info(f"  Error: {e}")
 
             # reduced from 2–6s to 0.3–0.8s — still slower than bots
             time.sleep(random.uniform(0.3, 0.8))
@@ -39,13 +43,13 @@ def simulate_human(num_sessions=40):
 
         # progress update every 10 sessions so you know it's running
         if (i + 1) % 10 == 0:
-            print(f"  {i+1}/{num_sessions} human sessions done...")
+            logger.info(f"  {i+1}/{num_sessions} human sessions done...")
 
-    print(f"Done — {num_sessions} human sessions logged.")
+    logger.info(f"Done — {num_sessions} human sessions logged.")
 
 
 def simulate_bot(num_sessions=40):
-    print("\nSimulating bot traffic...")
+    logger.info("\nSimulating bot traffic...")
 
     bot_agents = [
         "python-requests/2.28.0",
@@ -64,7 +68,7 @@ def simulate_bot(num_sessions=40):
                     timeout=3
                 )
             except Exception as e:
-                print(f"  Error: {e}")
+                logger.info(f"  Error: {e}")
 
             # bots are fast — barely any pause
             time.sleep(random.uniform(0.01, 0.05))
@@ -72,13 +76,13 @@ def simulate_bot(num_sessions=40):
         time.sleep(random.uniform(0.05, 0.15))
 
         if (i + 1) % 10 == 0:
-            print(f"  {i+1}/{num_sessions} bot sessions done...")
+            logger.info(f"  {i+1}/{num_sessions} bot sessions done...")
 
-    print(f"Done — {num_sessions} bot sessions logged.")
+    logger.info(f"Done — {num_sessions} bot sessions logged.")
 
 
 def simulate_evasive_bot(num_sessions=20):
-    print("\nSimulating evasive bot traffic...")
+    logger.info("\nSimulating evasive bot traffic...")
     # Evasive bots try to mimic humans: normal user agents, realistic delays, mixing regular pages
 
     for i in range(num_sessions):
@@ -98,7 +102,7 @@ def simulate_evasive_bot(num_sessions=20):
                     timeout=3
                 )
             except Exception as e:
-                print(f"  Error: {e}")
+                logger.info(f"  Error: {e}")
 
             # Evasive bots add human-like delays
             time.sleep(random.uniform(0.2, 0.7))
@@ -106,14 +110,14 @@ def simulate_evasive_bot(num_sessions=20):
         time.sleep(random.uniform(0.1, 0.4))
 
         if (i + 1) % 5 == 0:
-            print(f"  {i+1}/{num_sessions} evasive bot sessions done...")
+            logger.info(f"  {i+1}/{num_sessions} evasive bot sessions done...")
 
-    print(f"Done — {num_sessions} evasive bot sessions logged.")
+    logger.info(f"Done — {num_sessions} evasive bot sessions logged.")
 
 
 if __name__ == "__main__":
-    print("Starting Victor traffic simulation...\n")
+    logger.info("Starting Victor traffic simulation...\n")
     simulate_human(num_sessions=40)
     simulate_bot(num_sessions=40)
     simulate_evasive_bot(num_sessions=20)
-    print("\nAll done! Traffic logged to data/victor_traffic.db")
+    logger.info("\nAll done! Traffic logged to data/victor_traffic.db")

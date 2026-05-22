@@ -33,6 +33,10 @@ db  = TrafficDatabase()
 atexit.register(db.close)
 
 import hashlib
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 
 # ──────────────────────────────────────────────────────────────────
 # DATACENTER IP CHECKER
@@ -49,7 +53,7 @@ class DatacenterChecker:
 
     def _load(self, path: str):
         if not os.path.exists(path):
-            print(f"[DatacenterChecker] CIDR file not found: {path}")
+            logger.info(f"[DatacenterChecker] CIDR file not found: {path}")
             return
         with open(path) as f:
             data = json.load(f)
@@ -58,7 +62,7 @@ class DatacenterChecker:
                 self.networks.append(ipaddress.ip_network(cidr, strict=False))
             except ValueError:
                 pass
-        print(f"[DatacenterChecker] {len(self.networks)} CIDR ranges loaded")
+        logger.info(f"[DatacenterChecker] {len(self.networks)} CIDR ranges loaded")
 
     def is_datacenter(self, ip: str) -> int:
         try:
@@ -107,8 +111,8 @@ class RealTimeScorer:
             model_path = Config.get("paths.xgboost_model",  Paths.XGB_MODEL)
 
             if not os.path.exists(model_path):
-                print("[RealTimeScorer] No model found — run train_model.py first")
-                print("[RealTimeScorer] Real-time scoring disabled until model is available")
+                logger.info("[RealTimeScorer] No model found — run train_model.py first")
+                logger.info("[RealTimeScorer] Real-time scoring disabled until model is available")
                 return
 
             self.model = joblib.load(model_path)
@@ -120,12 +124,12 @@ class RealTimeScorer:
                 # Fallback to config if feature_cols.json doesn't exist yet
                 self.feature_cols = Config.get("features.columns", [])
 
-            print(f"[RealTimeScorer] Model loaded  ({len(self.feature_cols)} features)")
-            print(f"[RealTimeScorer] Threshold: {self.threshold}  |  "
+            logger.info(f"[RealTimeScorer] Model loaded  ({len(self.feature_cols)} features)")
+            logger.info(f"[RealTimeScorer] Threshold: {self.threshold}  |  "
                   f"Blocking: {'ON' if self.blocking else 'OFF (log-only)'}")
 
         except Exception as e:
-            print(f"[RealTimeScorer] Load error: {e}")
+            logger.info(f"[RealTimeScorer] Load error: {e}")
 
     def _push(self, ip: str, record: dict) -> list:
         """Append record to IP session history and return a snapshot."""
@@ -205,7 +209,7 @@ class RealTimeScorer:
             X        = [[feat_map.get(c, 0) for c in self.feature_cols]]
             score    = float(self.model.predict_proba(X)[0, 1])
         except Exception as e:
-            print(f"[RealTimeScorer] Scoring error: {e}")
+            logger.info(f"[RealTimeScorer] Scoring error: {e}")
             return -1.0, False
 
         is_bot = score >= self.threshold
@@ -330,7 +334,7 @@ def save_request(response):
                 is_blocked      = log_data.get("is_blocked",      0),
             )
         except Exception as e:
-            print(f"[DB Error] Failed to log request: {e}")
+            logger.info(f"[DB Error] Failed to log request: {e}")
     return response
 
 
@@ -438,33 +442,33 @@ def server_error(error):
 # MAIN
 # ──────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("=" * 62)
-    print("  VICTOR HONEYPOT SERVER  —  Real-Time Bot Detection")
-    print("=" * 62)
-    print(f"  URL:              http://127.0.0.1:5000")
-    print(f"  Model loaded:     {'Yes ✓' if scorer.model is not None else 'No — run train_model.py'}")
-    print(f"  Blocking mode:    {'ON  — bots get 403' if scorer.blocking else 'OFF — log only'}")
-    print(f"  Threshold:        {scorer.threshold}")
-    print(f"  Datacenter CIDRs: {len(dc_checker.networks)}")
+    logger.info("=" * 62)
+    logger.info("  VICTOR HONEYPOT SERVER  —  Real-Time Bot Detection")
+    logger.info("=" * 62)
+    logger.info(f"  URL:              http://127.0.0.1:5000")
+    logger.info(f"  Model loaded:     {'Yes ✓' if scorer.model is not None else 'No — run train_model.py'}")
+    logger.info(f"  Blocking mode:    {'ON  — bots get 403' if scorer.blocking else 'OFF — log only'}")
+    logger.info(f"  Threshold:        {scorer.threshold}")
+    logger.info(f"  Datacenter CIDRs: {len(dc_checker.networks)}")
 
     # Webhook alert status
     _slack   = "✓ Active" if alert_manager.slack_url   else "✗ Not configured"
     _discord = "✓ Active" if alert_manager.discord_url else "✗ Not configured"
-    print(f"  Alert threshold:  ≥ {alert_manager.threshold:.0%} confidence")
-    print(f"  Slack alerts:     {_slack}")
-    print(f"  Discord alerts:   {_discord}")
+    logger.info(f"  Alert threshold:  ≥ {alert_manager.threshold:.0%} confidence")
+    logger.info(f"  Slack alerts:     {_slack}")
+    logger.info(f"  Discord alerts:   {_discord}")
 
-    print()
-    print("  Endpoints:")
-    print("    GET /                    Homepage")
-    print("    GET /articles            Articles")
-    print("    GET /about               About")
-    print("    GET /secret-data         Honeypot trap")
-    print("    GET /api/status          Server status")
-    print("    GET /api/realtime-stats  Scoring stats")
-    print()
-    print("  Traffic logged to: data/victor_traffic.db")
-    print("=" * 62)
+    logger.info()
+    logger.info("  Endpoints:")
+    logger.info("    GET /                    Homepage")
+    logger.info("    GET /articles            Articles")
+    logger.info("    GET /about               About")
+    logger.info("    GET /secret-data         Honeypot trap")
+    logger.info("    GET /api/status          Server status")
+    logger.info("    GET /api/realtime-stats  Scoring stats")
+    logger.info()
+    logger.info("  Traffic logged to: data/victor_traffic.db")
+    logger.info("=" * 62)
 
     host = os.environ.get("FLASK_HOST", "0.0.0.0")
     port = int(os.environ.get("FLASK_PORT", 5000))

@@ -30,6 +30,10 @@ from sklearn.metrics import (classification_report,
                              f1_score)
 from xgboost import XGBClassifier
 from config_loader import Config
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 
 Config()  # load singleton before accessing any keys
 
@@ -38,10 +42,10 @@ def main():
     # STEP 0 — Synthetic-data warning (Issue 10)
     # ──────────────────────────────────────────────────────────────────
     SYNTHETIC_DATA_PATH = Paths.FEATURES
-    print("=" * 62)
-    print("  VICTOR — Model Training")
-    print("=" * 62)
-    print("""
+    logger.info("=" * 62)
+    logger.info("  VICTOR — Model Training")
+    logger.info("=" * 62)
+    logger.info("""
     [WARNING] Training data source
       The features.csv file is generated from simulate_traffic.py,
       which produces *synthetic* traffic with highly separable bot /
@@ -77,16 +81,16 @@ def main():
     FEATURE_COLS = [c for c in ALL_FEATURE_COLS if c in df.columns]
     missing = set(ALL_FEATURE_COLS) - set(FEATURE_COLS)
     if missing:
-        print(f"  Warning: {len(missing)} feature(s) not in CSV "
+        logger.warning(f"  Warning: {len(missing)} feature(s) not in CSV "
               f"(re-run feature_engineering.py to get them):")
         for m in sorted(missing):
-            print(f"    - {m}")
-    print(f"  Training on {len(FEATURE_COLS)} features: {FEATURE_COLS}")
+            logger.info(f"    - {m}")
+    logger.info(f"  Training on {len(FEATURE_COLS)} features: {FEATURE_COLS}")
 
     X = df[FEATURE_COLS]
     y = df["label"]
 
-    print(f"\nDataset: {len(df)} rows | Bots: {y.sum()} | Humans: {(y==0).sum()}")
+    logger.info(f"\nDataset: {len(df)} rows | Bots: {y.sum()} | Humans: {(y==0).sum()}")
 
     if y.nunique() < 2:
         msg = (
@@ -136,10 +140,10 @@ def main():
     iso_preds_bin  = (iso_forest.predict(X_test) == -1).astype(int)
     iso_auc        = roc_auc_score(y_test, iso_scores_test)
 
-    print("\n--- Isolation Forest (evaluated on held-out test set) ---")
-    print(classification_report(y_test, iso_preds_bin,
+    logger.info("\n--- Isolation Forest (evaluated on held-out test set) ---")
+    logger.info(classification_report(y_test, iso_preds_bin,
                                  target_names=["Human", "Bot"], zero_division=0))
-    print(f"ROC-AUC (test): {iso_auc:.3f}")
+    logger.info(f"ROC-AUC (test): {iso_auc:.3f}")
 
     # ──────────────────────────────────────────────────────────────────
     # STEP 4 — XGBoost (supervised)
@@ -171,10 +175,10 @@ def main():
     xgb_rec         = recall_score(y_test, xgb_preds, zero_division=0)
     xgb_f1          = f1_score(y_test, xgb_preds, zero_division=0)
 
-    print("\n--- XGBoost ---")
-    print(classification_report(y_test, xgb_preds,
+    logger.info("\n--- XGBoost ---")
+    logger.info(classification_report(y_test, xgb_preds,
                                  target_names=["Human", "Bot"], zero_division=0))
-    print(f"ROC-AUC: {xgb_auc:.3f}")
+    logger.info(f"ROC-AUC: {xgb_auc:.3f}")
 
     # ──────────────────────────────────────────────────────────────────
     # STEP 5 — Tune ensemble weights via grid-search (Issue 7)
@@ -195,7 +199,7 @@ def main():
     weight_candidates = [(round(w, 1), round(1.0 - w, 1))
                          for w in np.arange(0.0, 1.01, 0.1)]
 
-    print("\n--- Ensemble weight grid-search ---")
+    logger.info("\n--- Ensemble weight grid-search ---")
     best_auc, best_iso_w, best_xgb_w = -1.0, cfg_iso_w, cfg_xgb_w
     for iso_w, xgb_w in weight_candidates:
         trial_score = iso_scores_test * iso_w + xgb_scores_test * xgb_w
@@ -206,8 +210,8 @@ def main():
         if trial_auc > best_auc:
             best_auc, best_iso_w, best_xgb_w = trial_auc, iso_w, xgb_w
 
-    print(f"  Config default : iso={cfg_iso_w:.1f} / xgb={cfg_xgb_w:.1f}")
-    print(f"  Best weights   : iso={best_iso_w:.1f} / xgb={best_xgb_w:.1f}  "
+    logger.info(f"  Config default : iso={cfg_iso_w:.1f} / xgb={cfg_xgb_w:.1f}")
+    logger.info(f"  Best weights   : iso={best_iso_w:.1f} / xgb={best_xgb_w:.1f}  "
           f"→ ensemble AUC = {best_auc:.3f}")
 
     iso_w = best_iso_w
@@ -238,7 +242,7 @@ def main():
 
     total   = len(df)
     flagged = df["victor_flag"].sum()
-    print(f"\nVictor flagged {flagged}/{total} requests as bots "
+    logger.info(f"\nVictor flagged {flagged}/{total} requests as bots "
           f"({flagged/total*100:.1f}%)")
 
     # ──────────────────────────────────────────────────────────────────
@@ -253,22 +257,22 @@ def main():
     joblib.dump(xgb_model,  Paths.XGB_MODEL)
 
     # Versioned backups for rollback
-    joblib.dump(iso_forest, fPaths.VERSIONS_DIR / f"isolation_forest_{ts}.pkl")
-    joblib.dump(xgb_model,  fPaths.VERSIONS_DIR / f"xgboost_model_{ts}.pkl")
-    print(f"Models saved → models/  "
+    joblib.dump(iso_forest, Paths.VERSIONS_DIR / f"isolation_forest_{ts}.pkl")
+    joblib.dump(xgb_model,  Paths.VERSIONS_DIR / f"xgboost_model_{ts}.pkl")
+    logger.info(f"Models saved → models/  "
           f"(versioned backup: models/versions/*_{ts}.pkl)")
 
     # Save exact feature list used for training so the real-time scorer stays in sync
     with open(Paths.FEATURE_COLS, "w") as f:
         json.dump(FEATURE_COLS, f, indent=2)
-    print(f"Feature list saved → models/feature_cols.json  "
+    logger.info(f"Feature list saved → models/feature_cols.json  "
           f"({len(FEATURE_COLS)} features)")
 
     # Persist the tuned ensemble weights so dashboard & honeypot use them
     ensemble_weights = {"isolation_forest": iso_w, "xgboost": xgb_w}
     with open(Paths.ENSEMBLE_WEIGHTS, "w") as f:
         json.dump(ensemble_weights, f, indent=2)
-    print(f"Ensemble weights saved → models/ensemble_weights.json  "
+    logger.info(f"Ensemble weights saved → models/ensemble_weights.json  "
           f"(iso={iso_w}, xgb={xgb_w})")
 
     # Compute ensemble AUC on test set with final weights for the metrics file
@@ -293,8 +297,8 @@ def main():
     }
     with open(Paths.MODEL_METRICS, "w") as f:
         json.dump(metrics, f, indent=2)
-    print("Metrics saved to data/model_metrics.json")
-    print("\nDone! Run: streamlit run dashboard.py")
+    logger.info("Metrics saved to data/model_metrics.json")
+    logger.info("\nDone! Run: streamlit run dashboard.py")
 
 if __name__ == "__main__":
     main()

@@ -73,13 +73,13 @@ class AlertManager:
             enabled.append("Discord")
 
         if enabled:
-            print(f"[AlertManager] Active channels: {', '.join(enabled)}")
-            print(f"[AlertManager] Threshold: {self.threshold} | "
+            logger.info(f"[AlertManager] Active channels: {', '.join(enabled)}")
+            logger.info(f"[AlertManager] Threshold: {self.threshold} | "
                   f"Cooldown: {self.cooldown_secs}s | "
                   f"Rate limit: {self.max_per_minute}/min")
         else:
-            print("[AlertManager] No webhook URLs configured — alerts disabled.")
-            print("[AlertManager] Set SLACK_WEBHOOK_URL or DISCORD_WEBHOOK_URL "
+            logger.info("[AlertManager] No webhook URLs configured — alerts disabled.")
+            logger.info("[AlertManager] Set SLACK_WEBHOOK_URL or DISCORD_WEBHOOK_URL "
                   "environment variables to enable.")
 
     # ── Public API ──────────────────────────────────────────────────
@@ -217,7 +217,7 @@ class AlertManager:
             timeout=5,
         )
         resp.raise_for_status()
-        print(f"[AlertManager] Slack alert sent for {f['ip']} (score={f['score_raw']})")
+        logger.info(f"[AlertManager] Slack alert sent for {f['ip']} (score={f['score_raw']})")
 
     # ── Discord ─────────────────────────────────────────────────────
 
@@ -256,30 +256,29 @@ class AlertManager:
             timeout=5,
         )
         resp.raise_for_status()
-        print(f"[AlertManager] Discord alert sent for {f['ip']} (score={f['score_raw']})")
+        logger.info(f"[AlertManager] Discord alert sent for {f['ip']} (score={f['score_raw']})")
 
 
 # ──────────────────────────────────────────────────────────────────
 # SELF-TEST
 # ──────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("=" * 60)
-    print("  Victor — AlertManager Self-Test")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("  Victor — AlertManager Self-Test")
+    logger.info("=" * 60)
 
     slack_url   = os.environ.get("SLACK_WEBHOOK_URL",   "")
     discord_url = os.environ.get("DISCORD_WEBHOOK_URL", "")
 
     if not slack_url and not discord_url:
-        print("\n⚠  No webhook URLs found in environment.")
-        print("   Set one or both before running the self-test:\n")
-        print("   Windows PowerShell:")
-        print('     $env:SLACK_WEBHOOK_URL   = "https://hooks.slack.com/services/..."')
-        print('     $env:DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."')
-        print("\n   Linux / macOS / Docker:")
-        print('     export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."')
-        print('     export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."')
-        print()
+        logger.warning("\n⚠  No webhook URLs found in environment.")
+        logger.warning("   Set one or both before running the self-test:\n")
+        logger.info("   Windows PowerShell:")
+        logger.info('     $env:SLACK_WEBHOOK_URL   = "https://hooks.slack.com/services/..."')
+        logger.info('     $env:DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."')
+        logger.info("\n   Linux / macOS / Docker:")
+        logger.info('     export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."')
+        logger.info('     export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."\n')
     else:
         am = AlertManager()
 
@@ -296,11 +295,11 @@ if __name__ == "__main__":
             "timestamp":        datetime.now(timezone.utc).isoformat(),
         }
 
-        print("\nSending test alert with score = 0.97 …\n")
+        logger.info("\nSending test alert with score = 0.97 …\n")
         am.fire(fake_record, score=0.97)
 
         # Give background thread time to complete
         time.sleep(3)
-        print("\nSelf-test complete. Check your Slack / Discord channel.")
+        logger.info("\nSelf-test complete. Check your Slack / Discord channel.")
 
-    print("=" * 60)
+    logger.info("=" * 60)

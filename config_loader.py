@@ -6,6 +6,9 @@ Centralizes all configuration values from config.yaml.
 import yaml
 import os
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -41,6 +44,8 @@ class Config:
             Config.get('detection.default_threshold')  -> 0.5
             Config.get('models.xgboost.n_estimators')  -> 300
         """
+        if cls._config is None:
+            cls()
         config = cls._config
         keys = key.split('.')
         
@@ -66,6 +71,8 @@ class Config:
             Config.get_section('paths')
             Config.get_section('models')
         """
+        if cls._config is None:
+            cls()
         return cls._config.get(section, {})
     
     @classmethod
@@ -111,32 +118,32 @@ def get_dashboard_config():
 if __name__ == "__main__":
     config = Config()
     
-    print("=== Victor Configuration ===\n")
+    logger.info("=== Victor Configuration ===\n")
     
-    print("FILE PATHS:")
-    print(f"  Features: {config.get('paths.features')}")
-    print(f"  Predictions: {config.get('paths.predictions')}")
-    print(f"  XGBoost Model: {config.get('paths.xgboost_model')}")
+    logger.info("FILE PATHS:")
+    logger.info(f"  Features: {config.get('paths.features')}")
+    logger.info(f"  Predictions: {config.get('paths.predictions')}")
+    logger.info(f"  XGBoost Model: {config.get('paths.xgboost_model')}")
     
-    print("\nMODEL TRAINING:")
-    print(f"  XGBoost n_estimators: {config.get('models.xgboost.n_estimators')}")
-    print(f"  Isolation Forest n_estimators: {config.get('models.isolation_forest.n_estimators')}")
+    logger.info("\nMODEL TRAINING:")
+    logger.info(f"  XGBoost n_estimators: {config.get('models.xgboost.n_estimators')}")
+    logger.info(f"  Isolation Forest n_estimators: {config.get('models.isolation_forest.n_estimators')}")
     
-    print("\nDETECTION:")
-    print(f"  Default Threshold: {config.get('detection.default_threshold')}")
-    print(f"  Ensemble Method: {config.get('detection.ensemble_method')}")
+    logger.info("\nDETECTION:")
+    logger.info(f"  Default Threshold: {config.get('detection.default_threshold')}")
+    logger.info(f"  Ensemble Method: {config.get('detection.ensemble_method')}")
     
-    print("\nSIMULATION:")
-    print(f"  Base URL: {config.get('simulation.base_url')}")
-    print(f"  Human Sessions: {config.get('simulation.human.num_sessions')}")
-    print(f"  Bot Sessions: {config.get('simulation.bot.num_sessions')}")
+    logger.info("\nSIMULATION:")
+    logger.info(f"  Base URL: {config.get('simulation.base_url')}")
+    logger.info(f"  Human Sessions: {config.get('simulation.human.num_sessions')}")
+    logger.info(f"  Bot Sessions: {config.get('simulation.bot.num_sessions')}")
     
-    print("\nDASHBOARD:")
-    print(f"  Cache TTL: {config.get('dashboard.cache_ttl')} seconds")
-    print(f"  Activity Feed Size: {config.get('dashboard.activity_feed_size')}")
+    logger.info("\nDASHBOARD:")
+    logger.info(f"  Cache TTL: {config.get('dashboard.cache_ttl')} seconds")
+    logger.info(f"  Activity Feed Size: {config.get('dashboard.activity_feed_size')}")
     
-    print("\nFEATURES:")
+    logger.info("\nFEATURES:")
     features = config.get('features.columns')
-    print(f"  Total Features: {len(features)}")
+    logger.info(f"  Total Features: {len(features)}")
     for feat in features:
-        print(f"    - {feat}")
+        logger.info(f"    - {feat}")

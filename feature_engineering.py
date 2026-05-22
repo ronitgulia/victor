@@ -22,6 +22,10 @@ from config_loader import Config
 from config import Paths
 
 from database import TrafficDatabase
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 
 
 BOT_KEYWORDS = Config.get('features.bot_keywords', [])
@@ -44,7 +48,7 @@ FEATURE_COLS = [
 def _load_datacenter_ranges(path: str = Paths.DATACENTER_RANGES) -> list:
     """Load CIDR networks from the ranges JSON file."""
     if not os.path.exists(path):
-        print(f"  Warning: {path} not found — is_datacenter_ip will be 0 for all")
+        logger.warning(f"  Warning: {path} not found — is_datacenter_ip will be 0 for all")
         return []
     with open(path) as f:
         data = json.load(f)
@@ -54,7 +58,7 @@ def _load_datacenter_ranges(path: str = Paths.DATACENTER_RANGES) -> list:
             networks.append(ipaddress.ip_network(cidr, strict=False))
         except ValueError:
             pass
-    print(f"  Loaded {len(networks)} datacenter CIDR ranges")
+    logger.info(f"  Loaded {len(networks)} datacenter CIDR ranges")
     return networks
 
 
@@ -90,18 +94,18 @@ def _accept_encoding_score(enc: str) -> int:
 def engineer_features() -> pd.DataFrame:
     """Load raw SQLite logs and compute all 12 ML features."""
 
-    print("Loading traffic logs from database...")
+    logger.info("Loading traffic logs from database...")
     db  = TrafficDatabase()
     df  = db.get_all_logs()
     db.close()
 
     if len(df) == 0:
-        print("ERROR: No data found. Run honeypot.py + simulate_traffic.py first.")
+        logger.error("ERROR: No data found. Run honeypot.py + simulate_traffic.py first.")
         return pd.DataFrame()
 
     bots   = int(df["label"].sum())
     humans = int((df["label"] == 0).sum())
-    print(f"  {len(df)} rows | {bots} bots | {humans} humans")
+    logger.info(f"  {len(df)} rows | {bots} bots | {humans} humans")
 
     # ── Original 8 features ───────────────────────────────────────
     df["ua_is_suspicious"] = df["user_agent"].fillna("").str.contains(
@@ -136,7 +140,7 @@ def engineer_features() -> pd.DataFrame:
     df = df.merge(ip_agg, on="ip", how="left")
 
     # ── New 4 features (Step 6) ───────────────────────────────────
-    print("Computing new features (Step 6)...")
+    logger.info("Computing new features (Step 6)...")
 
     # 1. is_datacenter_ip
     dc_networks = _load_datacenter_ranges()
@@ -177,17 +181,17 @@ def engineer_features() -> pd.DataFrame:
     out  = df[[c for c in keep if c in df.columns]].copy()
 
     out.to_csv(Paths.FEATURES, index=False)
-    print(f"\nSaved → data/features.csv")
-    print(f"  Rows: {len(out)} | Features: {len(FEATURE_COLS)} | "
+    logger.info(f"\nSaved → data/features.csv")
+    logger.info(f"  Rows: {len(out)} | Features: {len(FEATURE_COLS)} | "
           f"Bots: {int(out['label'].sum())} | Humans: {int((out['label']==0).sum())}")
     return out
 
 
 if __name__ == "__main__":
-    print("=" * 58)
-    print("  VICTOR — Feature Engineering  (12 features)")
-    print("=" * 58)
+    logger.info("=" * 58)
+    logger.info("  VICTOR — Feature Engineering  (12 features)")
+    logger.info("=" * 58)
     result = engineer_features()
     if len(result) > 0:
-        print("\nNext step: python train_model.py")
-    print("=" * 58)
+        logger.info("\nNext step: python train_model.py")
+    logger.info("=" * 58)

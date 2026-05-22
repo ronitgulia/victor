@@ -29,3 +29,4 @@ class Paths:
     XGB_MODEL = MODELS_DIR / "xgboost_model.pkl"
     FEATURE_COLS = MODELS_DIR / "feature_cols.json"
     ENSEMBLE_WEIGHTS = MODELS_DIR / "ensemble_weights.json"
+    VERSIONS_DIR = VERSIONS_DIR

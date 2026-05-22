@@ -6,6 +6,10 @@ import re
 from config_loader import Config
 
 from config import Paths
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 DB_PATH = Paths.TRAFFIC_DB
 
 
