@@ -87,13 +87,15 @@ y = df["label"]
 print(f"\nDataset: {len(df)} rows | Bots: {y.sum()} | Humans: {(y==0).sum()}")
 
 if y.nunique() < 2:
-    print("\nERROR: Only one class found in labels.")
-    print("Please delete data/victor_traffic.db and re-run the pipeline:")
-    print("  python honeypot.py")
-    print("  python simulate_traffic.py")
-    print("  python feature_engineering.py")
-    print("  python train_model.py")
-    sys.exit(1)
+    msg = (
+        "\nERROR: Only one class found in labels.\n"
+        "Please delete data/victor_traffic.db and re-run the pipeline:\n"
+        "  python honeypot.py\n"
+        "  python simulate_traffic.py\n"
+        "  python feature_engineering.py\n"
+        "  python train_model.py"
+    )
+    raise SystemExit(msg)
 
 # ──────────────────────────────────────────────────────────────────
 # STEP 2 — Train / test split (shared by both models — Issue 8)

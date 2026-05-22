@@ -177,6 +177,7 @@ with st.sidebar:
         float(Config.get("detection.threshold_max", 1.0)),
         float(Config.get("detection.default_threshold", 0.5)),
         float(Config.get("detection.threshold_step", 0.05)),
+        key="threshold"
     )
 
     # Bot spike alert

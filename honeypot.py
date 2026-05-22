@@ -30,8 +30,7 @@ app = Flask(__name__)
 db  = TrafficDatabase()
 atexit.register(db.close)
 
-CURRENT_SESSION = str(uuid.uuid4())
-
+import hashlib
 
 # ──────────────────────────────────────────────────────────────────
 # DATACENTER IP CHECKER
@@ -288,7 +287,7 @@ def log_and_score_request():
         "header_count":     header_count,
         "path":             request.path,
         "method":           request.method,
-        "session_id":       CURRENT_SESSION,
+        "session_id":       hashlib.md5(f"{ip}-{user_agent}".encode()).hexdigest()[:16],
         "is_datacenter_ip": is_dc,
     }
 
@@ -314,22 +313,25 @@ def save_request(response):
     """Save the request (including score and blocked flag) to SQLite."""
     log_data = getattr(request, "log_data", {})
     if log_data:
-        db.log_request(
-            timestamp       = log_data["timestamp"],
-            ip              = log_data["ip"],
-            user_agent      = log_data["user_agent"],
-            referer         = log_data["referer"],
-            accept_lang     = log_data["accept_lang"],
-            path            = log_data["path"],
-            method          = log_data["method"],
-            status_code     = response.status_code,
-            session_id      = log_data["session_id"],
-            header_count    = log_data.get("header_count",    0),
-            accept_encoding = log_data.get("accept_encoding", "none"),
-            has_accept      = log_data.get("has_accept",      0),
-            bot_score       = log_data.get("bot_score",      -1.0),
-            is_blocked      = log_data.get("is_blocked",      0),
-        )
+        try:
+            db.log_request(
+                timestamp       = log_data["timestamp"],
+                ip              = log_data["ip"],
+                user_agent      = log_data["user_agent"],
+                referer         = log_data["referer"],
+                accept_lang     = log_data["accept_lang"],
+                path            = log_data["path"],
+                method          = log_data["method"],
+                status_code     = response.status_code,
+                session_id      = log_data["session_id"],
+                header_count    = log_data.get("header_count",    0),
+                accept_encoding = log_data.get("accept_encoding", "none"),
+                has_accept      = log_data.get("has_accept",      0),
+                bot_score       = log_data.get("bot_score",      -1.0),
+                is_blocked      = log_data.get("is_blocked",      0),
+            )
+        except Exception as e:
+            print(f"[DB Error] Failed to log request: {e}")
     return response
 
 
@@ -393,7 +395,6 @@ def api_status():
         "total_requests":  db.get_record_count(),
         "unique_ips":      db.get_unique_ips(),
         "blocked_total":   db.get_blocked_count(),
-        "current_session": CURRENT_SESSION,
         "timestamp":       datetime.utcnow().isoformat(),
     }), 200
 
@@ -442,7 +443,6 @@ if __name__ == "__main__":
     print("  VICTOR HONEYPOT SERVER  —  Real-Time Bot Detection")
     print("=" * 62)
     print(f"  URL:              http://127.0.0.1:5000")
-    print(f"  Session ID:       {CURRENT_SESSION}")
     print(f"  Model loaded:     {'Yes ✓' if scorer.model is not None else 'No — run train_model.py'}")
     print(f"  Blocking mode:    {'ON  — bots get 403' if scorer.blocking else 'OFF — log only'}")
     print(f"  Threshold:        {scorer.threshold}")
