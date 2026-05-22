@@ -113,6 +113,11 @@ def engineer_features() -> pd.DataFrame:
     df["ua_length"]       = df["user_agent"].str.len().fillna(0).astype(int)
 
     # Time gap between consecutive requests per IP
+    # ISSUE 9: We use fillna(0) instead of an arbitrary value like 5. 
+    # The first request from any IP has no preceding request, so the time gap 
+    # is mathematically undefined. Filling with 0 establishes a baseline without 
+    # introducing artificial separation between bots and humans that a value 
+    # like 5 seconds might create.
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     df = df.sort_values(["ip", "timestamp"]).reset_index(drop=True)
     df["time_gap_seconds"] = (
